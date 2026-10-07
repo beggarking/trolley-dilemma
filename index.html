@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141824">
+<title>트롤리 딜레마</title>
+<meta name="description" content="10개의 트롤리 딜레마, 당신의 선택은? 다른 사람들의 선택 비율도 확인해보세요.">
+<meta property="og:title" content="트롤리 딜레마 - 당신의 선택은?">
+<meta property="og:description" content="10개의 딜레마에 답하고 다른 사람들의 선택 비율을 확인해보세요.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1017;
+    --app: #141824;
+    --card: #1e2433;
+    --card2: #262d3f;
+    --scene: #1b2232;
+    --text: #f1f3f8;
+    --muted: #9aa3b5;
+    --a: #ff6b5b;
+    --a-dark: #d94c3d;
+    --b: #4fb3ff;
+    --b-dark: #2b8fdb;
+    --gold: #ffd23f;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+  }
+  .display { font-family: "Jua", sans-serif; font-weight: 400; letter-spacing: .01em; }
+
+  /* 스마트폰 화면 비율 (9:19.5) */
+  .app {
+    position: relative;
+    width: 100%;
+    height: 100dvh;
+    background: var(--app);
+    overflow: hidden;
+  }
+  @media (min-width: 520px) {
+    .app {
+      width: auto;
+      height: min(calc(100dvh - 40px), 880px);
+      aspect-ratio: 9 / 19.5;
+      border-radius: 36px;
+      box-shadow: 0 0 0 10px #000, 0 30px 80px rgba(0,0,0,.6);
+    }
+  }
+
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(12px);
+    transition: opacity .35s ease, transform .35s ease;
+  }
+  .screen.active { opacity: 1; pointer-events: auto; transform: none; }
+
+  svg.art { display: block; width: 100%; height: auto; border-radius: var(--radius); }
+  svg.art text { font-family: "Jua", sans-serif; }
+
+  /* 시작 화면 */
+  #intro { justify-content: center; text-align: center; gap: 18px; }
+  #intro .badge {
+    align-self: center;
+    font-size: 13px; color: var(--gold);
+    border: 1px solid rgba(255,210,63,.4);
+    padding: 5px 12px; border-radius: 99px;
+  }
+  #intro h1 { font-size: 44px; margin: 0; line-height: 1.1; }
+  #intro h1 span { color: var(--a); }
+  #intro p { margin: 0; color: var(--muted); line-height: 1.6; font-size: 15px; }
+
+  .btn {
+    appearance: none; border: 0; cursor: pointer;
+    width: 100%;
+    padding: 17px 18px;
+    border-radius: 16px;
+    font-size: 18px;
+    color: #fff;
+    background: var(--a);
+    box-shadow: 0 5px 0 var(--a-dark);
+    transition: transform .08s, box-shadow .08s;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--a-dark); }
+  .btn.ghost { background: var(--card2); box-shadow: 0 5px 0 #151a26; }
+  .btn.ghost:active { box-shadow: 0 1px 0 #151a26; }
+
+  /* 문항 화면 */
+  #quiz { gap: 14px; }
+  .progress-row { display: flex; align-items: center; gap: 12px; }
+  .progress { flex: 1; height: 8px; background: var(--card2); border-radius: 99px; overflow: hidden; }
+  .progress > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--a), var(--gold)); border-radius: 99px; transition: width .4s ease; }
+  .progress-num { font-size: 15px; color: var(--muted); min-width: 44px; text-align: right; }
+
+  .q-body { display: flex; flex-direction: column; gap: 14px; flex: 1; transition: opacity .25s, transform .25s; }
+  .q-body.out { opacity: 0; transform: translateX(-24px); }
+  .q-body.in { opacity: 0; transform: translateX(24px); transition: none; }
+  .q-title { font-size: 26px; margin: 2px 0 0; }
+  .q-title small { display: block; font-size: 14px; color: var(--gold); margin-bottom: 2px; }
+  .q-desc { margin: 0; font-size: 16px; line-height: 1.65; color: #d7dbe6; word-break: keep-all; }
+
+  .choices { margin-top: auto; display: flex; flex-direction: column; gap: 12px; padding-top: 6px; }
+  .choice {
+    appearance: none; border: 0; cursor: pointer; text-align: left;
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; padding: 14px 16px;
+    border-radius: 16px; color: #fff;
+    font-family: inherit;
+    transition: transform .08s, box-shadow .08s, filter .2s;
+  }
+  .choice.a { background: var(--a); box-shadow: 0 5px 0 var(--a-dark); }
+  .choice.b { background: var(--b); box-shadow: 0 5px 0 var(--b-dark); }
+  .choice:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.3); }
+  .choice:disabled { cursor: default; }
+  .choice.picked { filter: brightness(1.15); transform: scale(1.02); }
+  .choice.dim { filter: grayscale(.7) brightness(.6); }
+  .choice .letter {
+    flex: none; width: 36px; height: 36px; border-radius: 12px;
+    display: grid; place-items: center;
+    background: rgba(255,255,255,.25);
+    font-family: "Jua", sans-serif; font-size: 20px;
+  }
+  .choice .txt { display: flex; flex-direction: column; gap: 2px; }
+  .choice .main { font-size: 17px; font-weight: 700; line-height: 1.35; word-break: keep-all; }
+  .choice .sub { font-size: 13px; opacity: .85; }
+
+  /* 로딩 */
+  #loading { justify-content: center; align-items: center; gap: 18px; text-align: center; }
+  .spinner {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 5px solid var(--card2); border-top-color: var(--a);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 결과 화면 */
+  #result { gap: 16px; }
+  .r-top { text-align: center; padding: 8px 0 4px; }
+  .r-top h2 { font-size: 32px; margin: 0 0 6px; }
+  .r-top p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .r-summary {
+    background: var(--card); border-radius: var(--radius); padding: 16px;
+    display: flex; justify-content: space-around; text-align: center;
+  }
+  .r-summary b { display: block; font-family: "Jua", sans-serif; font-size: 28px; color: var(--gold); font-weight: 400; }
+  .r-summary span { font-size: 12px; color: var(--muted); }
+  .notice {
+    background: rgba(255,210,63,.1); color: var(--gold);
+    border: 1px solid rgba(255,210,63,.3);
+    border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.5;
+  }
+  .r-list { display: flex; flex-direction: column; gap: 12px; }
+  .r-item { background: var(--card); border-radius: var(--radius); padding: 14px 14px 12px; }
+  .r-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+  .r-head .num { color: var(--muted); font-size: 13px; }
+  .r-head .name { font-family: "Jua", sans-serif; font-size: 18px; }
+  .bar { display: flex; height: 30px; border-radius: 10px; overflow: hidden; background: var(--card2); }
+  .seg {
+    width: 0; display: flex; align-items: center;
+    font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden;
+    transition: width 1s cubic-bezier(.2,.8,.2,1);
+  }
+  .seg.a { background: var(--a); justify-content: flex-start; padding-left: 0; }
+  .seg.b { background: var(--b); justify-content: flex-end; }
+  .seg span { padding: 0 9px; }
+  .r-opts { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .r-opts div { flex: 1; line-height: 1.4; word-break: keep-all; }
+  .r-opts div:last-child { text-align: right; }
+  .r-opts .mine { color: var(--text); font-weight: 700; }
+  .r-opts .mine::before { content: "✔ 내 선택 · "; color: var(--gold); }
+  .r-actions { display: flex; flex-direction: column; gap: 12px; padding: 6px 0 10px; }
+  .toast {
+    position: absolute; left: 50%; bottom: 40px; transform: translate(-50%, 20px);
+    background: #000c; color: #fff; padding: 10px 16px; border-radius: 99px; font-size: 14px;
+    opacity: 0; transition: .3s; pointer-events: none; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <section class="screen active" id="intro">
+    <div class="badge">총 10문항 · 약 2분</div>
+    <h1 class="display">트롤리<br><span>딜레마</span></h1>
+    <div id="intro-art"></div>
+    <p>정답은 없어요. 당신이라면 어떻게 할까요?<br>마지막에 다른 사람들의 선택을 보여드릴게요.</p>
+    <button class="btn display" id="start-btn">시작하기</button>
+  </section>
+
+  <section class="screen" id="quiz">
+    <div class="progress-row">
+      <div class="progress"><div id="progress-bar"></div></div>
+      <div class="progress-num display" id="progress-num">1 / 10</div>
+    </div>
+    <div class="q-body" id="q-body"></div>
+  </section>
+
+  <section class="screen" id="loading">
+    <div class="spinner"></div>
+    <div class="display" style="font-size:20px">다른 사람들의 선택을 불러오는 중…</div>
+  </section>
+
+  <section class="screen" id="result"></section>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* =========================================================
+   Supabase 설정
+   Supabase 대시보드 > Project Settings > API 에서 복사해 넣으세요.
+   - SUPABASE_URL: Project URL (https://xxxx.supabase.co)
+   - SUPABASE_KEY: anon(public) 키 또는 publishable 키
+   이 키는 공개돼도 괜찮아요. (supabase-setup.sql의 보안 규칙이 적용됨)
+   service_role / secret 키는 절대 넣지 마세요!
+   ========================================================= */
+const SUPABASE_URL = 'https://vykpzywrgwgluldswias.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_vjDGzZdpn5w4tcOMgXLnfQ_ILVQk-e0';
+
+/* ---------------- 일러스트 (SVG) ---------------- */
+const PALETTE = ['#f2c14e', '#7bc4a4', '#e98a6b', '#9fa8ff', '#f28fb1'];
+const HEART = 'M0 4 L-5 -1 A2.8 2.8 0 0 1 0 -4 A2.8 2.8 0 0 1 5 -1 Z';
+
+const scene = (content) => `
+<svg class="art" viewBox="0 0 320 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect width="320" height="200" fill="var(--scene)"/>
+  <g fill="#fff" opacity=".18">
+    <circle cx="30" cy="22" r="1.4"/><circle cx="92" cy="40" r="1"/><circle cx="150" cy="16" r="1.3"/>
+    <circle cx="210" cy="34" r="1"/><circle cx="268" cy="18" r="1.5"/><circle cx="300" cy="46" r="1"/>
+  </g>
+  ${content}
+</svg>`;
+
+const person = (x, y, c = PALETTE[0], s = 1, extra = '') => `
+<g transform="translate(${x} ${y}) scale(${s})">
+  <rect x="-5" y="-5" width="4" height="5" rx="1" fill="${c}"/>
+  <rect x="1" y="-5" width="4" height="5" rx="1" fill="${c}"/>
+  <rect x="-6" y="-17" width="12" height="14" rx="5" fill="${c}"/>
+  <circle cy="-23" r="6.5" fill="#f6d7b0"/>
+  <circle cx="-2.3" cy="-23.5" r=".9" fill="#2a2a2a"/><circle cx="2.3" cy="-23.5" r=".9" fill="#2a2a2a"/>
+  ${extra}
+</g>`;
+
+const crowd = (xs, y, s = 1) => xs.map((x, i) => person(x, y, PALETTE[i % PALETTE.length], s)).join('');
+
+const trolley = (x, y) => `
+<g transform="translate(${x} ${y})">
+  <path d="M-6 -30 h-10 M-6 -22 h-16 M-6 -14 h-10" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".45"/>
+  <rect x="-2" y="-43" width="68" height="6" rx="3" fill="#b8402f"/>
+  <rect x="0" y="-39" width="64" height="31" rx="6" fill="#e05a47"/>
+  <rect x="6" y="-33" width="14" height="12" rx="2" fill="#cfe8ff"/>
+  <rect x="25" y="-33" width="14" height="12" rx="2" fill="#cfe8ff"/>
+  <rect x="44" y="-33" width="14" height="12" rx="2" fill="#cfe8ff"/>
+  <rect x="58" y="-16" width="6" height="5" rx="2" fill="#ffe28a"/>
+  <circle cx="14" cy="-6" r="6" fill="#2a2a2a"/><circle cx="50" cy="-6" r="6" fill="#2a2a2a"/>
+  <circle cx="14" cy="-6" r="2" fill="#888"/><circle cx="50" cy="-6" r="2" fill="#888"/>
+</g>`;
+
+function tracks(paths) {
+  const layer = (stroke, w, dash = '') =>
+    paths.map(d => `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${w}" ${dash}/>`).join('');
+  return layer('#5a4636', 18, 'stroke-dasharray="4 7"') + layer('#a7b0c0', 10) + layer('#3d3128', 6);
+}
+
+const lever = (x, y) => `
+<g transform="translate(${x} ${y})">
+  <line x1="0" y1="0" x2="10" y2="-22" stroke="#b9c0cc" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="10" cy="-22" r="4.5" fill="#e05a47"/>
+  <rect x="-11" y="-4" width="22" height="9" rx="3" fill="#565d6b"/>
+</g>`;
+
+const tag = (x, y, t, c) => `
+<g><circle cx="${x}" cy="${y}" r="10" fill="${c}"/>
+<text x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#fff">${t}</text></g>`;
+
+// 갈림길 장면: 위쪽 선로 = 레버를 당기면 가는 길(A), 아래쪽 = 원래 길(B)
+function forkScene(top, bottom, showTags = true) {
+  return scene(
+    tracks(['M-10 150 L120 150', 'M120 150 L330 150', 'M120 150 C170 150 180 80 230 80 L330 80']) +
+    lever(104, 188) +
+    (showTags ? tag(158, 96, 'A', 'var(--a)') + tag(172, 176, 'B', 'var(--b)') : '') +
+    trolley(16, 150) + top + bottom
+  );
+}
+
+const heartAbove = (y = -38, s = 1.4) => `<path transform="translate(0 ${y}) scale(${s})" d="${HEART}" fill="#ff5d73"/>`;
+
+const chicken = (x, y) => `
+<g transform="translate(${x} ${y})">
+  <line x1="-2" y1="-5" x2="-2" y2="0" stroke="#f0a030" stroke-width="1.6"/>
+  <line x1="2" y1="-5" x2="2" y2="0" stroke="#f0a030" stroke-width="1.6"/>
+  <ellipse cy="-10" rx="8" ry="6.5" fill="#fafafa"/>
+  <path d="M-8 -12 l-4 -4 l1 6z" fill="#e8e8e8"/>
+  <circle cx="4.5" cy="-17" r="4.3" fill="#fafafa"/>
+  <circle cx="3.5" cy="-21.6" r="1.8" fill="#e5383b"/><circle cx="6.2" cy="-21.2" r="1.6" fill="#e5383b"/>
+  <path d="M8.5 -17.8 l3.5 1.2 l-3.5 1.2z" fill="#f0a030"/>
+  <circle cx="5.6" cy="-17.8" r=".9" fill="#222"/>
+</g>`;
+
+const cat = (x, y) => `
+<g transform="translate(${x} ${y})">
+  <path d="M9 -8 q13 -3 9 -19" stroke="#f4a259" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <ellipse cy="-9" rx="11" ry="8" fill="#f4a259"/>
+  <path d="M-4 -14 l3 8 M1 -15 l3 8" stroke="#d9823c" stroke-width="1.5"/>
+  <circle cx="-8" cy="-20" r="7.5" fill="#f4a259"/>
+  <path d="M-14.5 -23 l1 -10 l5.5 5.5z M-1.5 -23 l-1 -10 l-5.5 5.5z" fill="#f4a259"/>
+  <circle cx="-10.6" cy="-20.5" r="1.1" fill="#222"/><circle cx="-5.4" cy="-20.5" r="1.1" fill="#222"/>
+  <path d="M-8 -17.6 l-1 1 M-8 -17.6 l1 1" stroke="#222" stroke-width=".8"/>
+  <path transform="translate(-8 -38) scale(1.3)" d="${HEART}" fill="#ff5d73"/>
+</g>`;
+
+const ART = [
+  // 1. 클래식 트롤리
+  () => forkScene(person(275, 80, '#7bc4a4'), crowd([218, 238, 258, 278, 298], 150)),
+
+  // 2. 뚱뚱한 남자 (육교)
+  () => {
+    const posts = [122, 144, 166, 188, 210, 232, 246].map(x => `<line x1="${x}" y1="78" x2="${x}" y2="92" stroke="#8a7763" stroke-width="2.5"/>`).join('');
+    const pushArm = '<path d="M5 -12 L14 -13" stroke="#f2c14e" stroke-width="3.5" stroke-linecap="round"/>';
+    return scene(
+      '<rect x="128" y="96" width="8" height="104" fill="#5f5243"/><rect x="232" y="96" width="8" height="104" fill="#5f5243"/>' +
+      tracks(['M-10 172 L330 172']) +
+      '<rect x="118" y="92" width="132" height="10" rx="2" fill="#8a7763"/><path d="M118 78 H250" stroke="#8a7763" stroke-width="3"/>' + posts +
+      person(168, 92, '#f2c14e', 1, pushArm) + person(196, 92, '#8e7cc3', 1.5) +
+      '<path d="M212 104 Q226 124 222 146" stroke="var(--a)" stroke-width="2.5" stroke-dasharray="4 4" fill="none"/><path d="M216 144 L222 154 L228 143Z" fill="var(--a)"/>' +
+      trolley(16, 172) + crowd([262, 274, 286, 298, 310], 172, .9)
+    );
+  },
+
+  // 3. 의사의 장기 이식
+  () => {
+    let beds = '';
+    for (let i = 0; i < 5; i++) {
+      const y = 36 + i * 32;
+      beds += `
+        <path d="M150 100 Q175 ${(100 + y) / 2} 198 ${y - 2}" stroke="#ff9fb0" stroke-width="1.6" stroke-dasharray="3 4" fill="none"/>
+        <rect x="203" y="${y + 9}" width="3" height="9" fill="#9aa3b5"/><rect x="290" y="${y + 9}" width="3" height="9" fill="#9aa3b5"/>
+        <rect x="200" y="${y}" width="96" height="10" rx="3" fill="#cfd6e3"/>
+        <rect x="204" y="${y - 6}" width="17" height="7" rx="3" fill="#fff"/>
+        <circle cx="212" cy="${y - 8}" r="5.5" fill="#e8c8a8"/>
+        <rect x="221" y="${y - 8}" width="72" height="9" rx="4" fill="${PALETTE[i]}"/>`;
+    }
+    return scene(
+      '<g transform="translate(38 40)"><rect x="-12" y="-4" width="24" height="8" rx="2" fill="#ff5d73"/><rect x="-4" y="-12" width="8" height="24" rx="2" fill="#ff5d73"/></g>' +
+      '<rect y="182" width="320" height="18" fill="#232a3a"/>' +
+      person(62, 182, '#7bc4a4', 1.8, '<path d="M-2.5 -20.5 q2.5 2 5 0" stroke="#2a2a2a" stroke-width=".9" fill="none"/>') +
+      `<g transform="translate(128 78) scale(2.4)"><path d="${HEART}" fill="#e5383b"/></g>` +
+      '<ellipse cx="118" cy="112" rx="5" ry="8" fill="#c0504d"/><ellipse cx="136" cy="112" rx="5" ry="8" fill="#c0504d"/>' +
+      '<path d="M110 132 q18 -10 34 0 q-6 12 -20 10 q-12 -1 -14 -10z" fill="#a8423b"/>' +
+      beds
+    );
+  },
+
+  // 4. 자율주행차
+  () => {
+    const stripes = [222, 236, 250, 264, 278, 292].map(x => `<rect x="${x}" y="112" width="8" height="76" fill="#e9edf3" opacity=".8"/>`).join('');
+    return scene(
+      `<defs><pattern id="hz4" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#ffd23f"/><rect width="5" height="10" fill="#222"/></pattern></defs>` +
+      '<rect y="110" width="320" height="80" fill="#3a3f4b"/><path d="M0 112 H320 M0 188 H320" stroke="#c9ced8" stroke-width="2"/>' +
+      '<path d="M0 150 H210" stroke="#e8c547" stroke-width="2" stroke-dasharray="12 10"/>' + stripes +
+      '<rect x="150" y="44" width="84" height="34" fill="#80868f"/><path d="M150 55 H234 M150 66 H234 M178 44 V55 M206 44 V55 M164 55 V66 M192 55 V66 M220 55 V66" stroke="#6b7079" stroke-width="1.5"/>' +
+      '<rect x="150" y="78" width="84" height="9" fill="url(#hz4)"/>' +
+      `<g transform="translate(28 168)">
+        <rect x="0" y="-26" width="72" height="20" rx="7" fill="#4fb3ff"/>
+        <path d="M14 -26 L22 -41 H50 L58 -26Z" fill="#4fb3ff"/>
+        <path d="M19 -27 L25 -38 H35 V-27Z M38 -27 V-38 H48 L54 -27Z" fill="#cfe8ff"/>
+        <circle cx="30" cy="-31" r="4.2" fill="#f6d7b0"/>
+        <rect x="66" y="-22" width="6" height="5" rx="2" fill="#ffe28a"/>
+        <circle cx="16" cy="-6" r="7" fill="#222"/><circle cx="56" cy="-6" r="7" fill="#222"/>
+      </g>` +
+      person(238, 172, '#f2c14e') + person(256, 166, '#e98a6b') + person(274, 172, '#9fa8ff') +
+      '<path d="M108 156 H210" stroke="var(--a)" stroke-width="3" stroke-dasharray="6 5"/><path d="M210 150 L220 156 L210 162Z" fill="var(--a)"/>' +
+      '<path d="M106 136 Q150 128 164 100" stroke="var(--b)" stroke-width="3" stroke-dasharray="6 5" fill="none"/><path d="M158 102 L167 91 L170 104Z" fill="var(--b)"/>' +
+      tag(160, 174, 'A', 'var(--a)') + tag(124, 112, 'B', 'var(--b)')
+    );
+  },
+
+  // 5. 가족 vs 낯선 사람들
+  () => forkScene(person(275, 80, '#f28fb1', 1, heartAbove()), crowd([218, 238, 258, 278, 298], 150).replace(/#f28fb1/g, '#b0b8c8')),
+
+  // 6. 미래의 천재
+  () => {
+    const genius = person(275, 80, '#eef2f7', 1.05,
+      '<rect x="-1" y="-17" width="2" height="12" fill="#9aa3b5"/>' +
+      '<circle cx="-2.6" cy="-23.5" r="2.2" fill="none" stroke="#333" stroke-width="1"/><circle cx="2.6" cy="-23.5" r="2.2" fill="none" stroke="#333" stroke-width="1"/>' +
+      '<g transform="translate(0 -44)"><path d="M-6 -6 l-3 -3 M6 -6 l3 -3 M0 -9 v-4 M-8 1 h-4 M8 1 h4" stroke="#ffd23f" stroke-width="1.6" stroke-linecap="round"/><circle r="6" fill="#ffd23f"/><rect x="-3" y="5" width="6" height="4" rx="1" fill="#aaa"/></g>'
+    );
+    return forkScene(genius, crowd([218, 238, 258, 278, 298], 150), false);
+  },
+
+  // 7. 규칙을 어긴 사람들
+  () => {
+    const worker = person(275, 80, '#ff8c1a', 1,
+      '<rect x="-6" y="-11" width="12" height="2" fill="#fff"/>' +
+      '<path d="M-7.5 -25 A7.5 7.5 0 0 1 7.5 -25 Z" fill="#ffd23f"/><rect x="-9.5" y="-26" width="19" height="2.6" rx="1" fill="#ffd23f"/>' +
+      '<path d="M7 -12 l7 -6" stroke="#ff8c1a" stroke-width="3" stroke-linecap="round"/><rect x="12" y="-24" width="3" height="10" fill="#8a7a66" transform="rotate(30 13 -19)"/>'
+    );
+    const sign = '<rect x="199" y="104" width="4" height="46" fill="#8a7a66"/><rect x="174" y="94" width="54" height="20" rx="3" fill="#ffd23f" stroke="#222" stroke-width="2"/><text x="201" y="105" text-anchor="middle" dominant-baseline="middle" font-size="11" fill="#c0262d">출입금지</text>';
+    return forkScene(worker, sign + crowd([222, 241, 260, 279, 298], 150));
+  },
+
+  // 8. 도시 관리 AI
+  () => scene(
+    '<rect y="172" width="320" height="28" fill="#232a3a"/>' +
+    '<path d="M148 70 Q100 92 72 128" stroke="#ffd23f" stroke-width="3" fill="none" stroke-dasharray="3 6" stroke-linecap="round"/>' +
+    '<path d="M172 70 Q210 70 236 92" stroke="#ffd23f" stroke-width="3" fill="none" stroke-dasharray="3 6" stroke-linecap="round"/>' +
+    '<circle cx="104" cy="98" r="11" fill="var(--scene)" stroke="#ffd23f" stroke-width="2"/><text x="104" y="99" text-anchor="middle" dominant-baseline="middle" font-size="14" fill="#ffd23f">?</text>' +
+    '<path d="M214 66 l-6 10 h6 l-4 9 l11 -13 h-6 l4 -6z" fill="#ffd23f"/>' +
+    '<circle cx="160" cy="48" r="36" fill="#5ee6ff" opacity=".1"/>' +
+    `<g transform="translate(160 48)">
+      <path d="M-14 -30 v6 M0 -30 v6 M14 -30 v6 M-14 24 v6 M0 24 v6 M14 24 v6 M-30 -14 h6 M-30 0 h6 M-30 14 h6 M24 -14 h6 M24 0 h6 M24 14 h6" stroke="#5ee6ff" stroke-width="2.5"/>
+      <rect x="-24" y="-24" width="48" height="48" rx="8" fill="#253049" stroke="#5ee6ff" stroke-width="2.5"/>
+      <text y="2" text-anchor="middle" dominant-baseline="middle" font-size="20" fill="#5ee6ff">AI</text>
+    </g>` +
+    // 외딴집
+    '<path d="M36 140 L64 116 L92 140Z" fill="#b85c4a"/><rect x="42" y="140" width="44" height="32" fill="#d9c7a7"/><rect x="50" y="148" width="11" height="11" fill="#ffe28a"/><rect x="68" y="152" width="10" height="20" fill="#7a5a43"/>' +
+    '<text x="64" y="188" text-anchor="middle" font-size="12" fill="#d7dbe6">외딴집 1명</text>' +
+    // 병원
+    '<rect x="206" y="94" width="84" height="78" rx="3" fill="#dfe5ee"/>' +
+    [0, 1, 2].map(r => [0, 1, 2, 3].map(c => `<rect x="${214 + c * 19}" y="${120 + r * 16}" width="11" height="9" fill="#ffe28a"/>`).join('')).join('') +
+    '<g transform="translate(248 106)"><rect x="-9" y="-3" width="18" height="6" rx="1" fill="#e5383b"/><rect x="-3" y="-9" width="6" height="18" rx="1" fill="#e5383b"/></g>' +
+    '<text x="248" y="188" text-anchor="middle" font-size="12" fill="#d7dbe6">병원 100명</text>'
+  ),
+
+  // 9. 시간 지연 버전
+  () => {
+    const hourglass = `<g transform="translate(222 150)">
+      <rect x="-11" y="-36" width="22" height="3.5" rx="1" fill="#c9a36a"/><rect x="-11" y="-3.5" width="22" height="3.5" rx="1" fill="#c9a36a"/>
+      <path d="M-8 -32.5 L8 -32.5 L1.2 -18 L8 -3.5 L-8 -3.5 L-1.2 -18Z" fill="#cfe8ff" opacity=".85"/>
+      <path d="M-5 -29.5 L5 -29.5 L0 -20Z" fill="#f2c14e"/><path d="M-6 -3.5 L6 -3.5 L0 -10Z" fill="#f2c14e"/></g>`;
+    const ghosts = `<g opacity=".4">${crowd([248, 263, 278, 293, 308], 150, .85)}</g>`;
+    const label = '<text x="278" y="106" text-anchor="middle" font-size="15" fill="#fff">100명?</text>' +
+      '<text x="262" y="182" text-anchor="middle" font-size="12" fill="var(--gold)">10년 후 · 확률 50%</text>';
+    return forkScene(person(275, 80, '#7bc4a4'), hourglass + ghosts + label);
+  },
+
+  // 10. 고양이 vs 닭 5마리
+  () => forkScene(cat(282, 80), [218, 238, 258, 278, 298].map(x => chicken(x, 150)).join('')),
+];
+
+/* ---------------- 문항 ---------------- */
+const QUESTIONS = [
+  { title: '클래식 트롤리', desc: '브레이크가 고장 난 트롤리가 5명이 있는 선로로 달려가고 있어. 레버를 당기면 다른 선로의 1명이 희생돼.',
+    a: ['레버를 당긴다', '1명 희생'], b: ['아무것도 하지 않는다', '5명 희생'] },
+  { title: '뚱뚱한 남자', desc: '트롤리가 5명을 향해 달려오고 있고, 다리 위에서 옆에 있는 사람을 밀어 떨어뜨리면 트롤리를 멈출 수 있어.',
+    a: ['사람을 민다', '1명 희생'], b: ['그냥 지켜본다', '5명 희생'] },
+  { title: '의사의 장기 이식', desc: '건강한 환자 1명의 장기를 나눠 쓰면 죽어가는 환자 5명을 살릴 수 있어. 아무도 눈치채지 못해.',
+    a: ['1명의 장기를 이식한다', ''], b: ['5명을 자연스럽게 떠나보낸다', ''] },
+  { title: '자율주행차', desc: '당신이 탄 자율주행차의 브레이크가 고장 났어. 직진하면 횡단보도의 보행자 3명이 다치고, 방향을 틀면 탑승자인 당신이 죽어.',
+    a: ['직진한다', '보행자 3명 사망'], b: ['방향을 튼다', '나 사망'] },
+  { title: '가족 vs 낯선 사람들', desc: '레버를 당기면 낯선 사람 5명을 살릴 수 있지만, 반대편 선로에는 당신의 가족 1명이 있어.',
+    a: ['레버를 당긴다', '가족 1명 희생'], b: ['당기지 않는다', '낯선 사람 5명 희생'] },
+  { title: '미래의 천재', desc: '5명의 평범한 사람과, 암 치료법을 발견할 가능성이 높은 천재 과학자 1명 중 한쪽만 구할 수 있어.',
+    a: ['천재 1명을 구한다', ''], b: ['5명을 구한다', ''] },
+  { title: '규칙을 어긴 사람들', desc: '선로 위의 5명은 "출입 금지" 표지판을 무시하고 들어갔고, 다른 선로의 1명은 규칙을 지키며 일하던 작업자야.',
+    a: ['레버를 당긴다', '작업자 1명 희생'], b: ['당기지 않는다', '무단 침입자 5명 희생'] },
+  { title: '100명 vs 1명 (AI 버전)', desc: '당신은 도시를 관리하는 AI야. 전력을 우회하면 병원 100명의 생명 유지 장치는 유지되지만, 외딴집에서 혼자 사는 1명의 전기가 끊겨 목숨이 위험해져.',
+    a: ['전력을 우회한다', ''], b: ['그대로 둔다', ''] },
+  { title: '시간 지연 버전', desc: '지금 레버를 당기면 1명이 확실히 죽지만, 당기지 않으면 10년 뒤에 100명이 죽을 수 있다는 예측이 있어. 확률은 50%야.',
+    a: ['지금 레버를 당긴다', '1명 확실히 희생'], b: ['당기지 않는다', '50% 확률로 100명 희생'] },
+  { title: '고양이 vs 닭 5마리', desc: '트롤리가 닭 5마리를 향해 달려가고 있어. 레버를 당기면 당신이 3년 동안 키운 고양이 한 마리가 희생돼.',
+    a: ['레버를 당긴다', '고양이 희생'], b: ['당기지 않는다', '닭 5마리 희생'] },
+];
+
+/* ---------------- 상태 & 화면 전환 ---------------- */
+const VOTED_KEY = 'trolley_voted_v1';
+let current = 0;
+let answers = [];
+let busy = false;
+
+const $ = (id) => document.getElementById(id);
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+  $(id).scrollTop = 0;
+}
+function storageGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function storageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function renderQuestion() {
+  const q = QUESTIONS[current];
+  $('progress-bar').style.width = `${(current / QUESTIONS.length) * 100}%`;
+  $('progress-num').textContent = `${current + 1} / ${QUESTIONS.length}`;
+  const choice = (key, [main, sub]) => `
+    <button class="choice ${key}" data-choice="${key.toUpperCase()}">
+      <span class="letter">${key.toUpperCase()}</span>
+      <span class="txt"><span class="main">${main}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</span>
+    </button>`;
+  $('q-body').innerHTML = `
+    <h2 class="q-title display"><small>QUESTION ${String(current + 1).padStart(2, '0')}</small>${q.title}</h2>
+    ${ART[current]()}
+    <p class="q-desc">${q.desc}</p>
+    <div class="choices">${choice('a', q.a)}${choice('b', q.b)}</div>`;
+  $('q-body').querySelectorAll('.choice').forEach(btn => btn.addEventListener('click', () => pick(btn)));
+}
+
+function pick(btn) {
+  if (busy) return;
+  busy = true;
+  answers[current] = btn.dataset.choice;
+  $('q-body').querySelectorAll('.choice').forEach(b => {
+    b.disabled = true;
+    b.classList.add(b === btn ? 'picked' : 'dim');
+  });
+  setTimeout(() => {
+    const body = $('q-body');
+    body.classList.add('out');
+    setTimeout(() => {
+      current++;
+      if (current >= QUESTIONS.length) {
+        $('progress-bar').style.width = '100%';
+        finish();
+        busy = false;
+        return;
+      }
+      body.classList.remove('out');
+      body.classList.add('in');
+      renderQuestion();
+      $('quiz').scrollTop = 0;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        body.classList.remove('in');
+        busy = false;
+      }));
+    }, 250);
+  }, 380);
+}
+
+/* ---------------- Supabase 통신 ---------------- */
+const configured = () => SUPABASE_URL && SUPABASE_KEY;
+function headers() {
+  const h = { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' };
+  if (SUPABASE_KEY.startsWith('eyJ')) h.Authorization = `Bearer ${SUPABASE_KEY}`; // 기존 anon(JWT) 키
+  return h;
+}
+async function submitAnswers(str) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/submissions`, {
+    method: 'POST',
+    headers: { ...headers(), Prefer: 'return=minimal' },
+    body: JSON.stringify({ answers: str }),
+  });
+  if (!res.ok) throw new Error(`submit ${res.status}`);
+}
+async function fetchStats() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_stats`, { method: 'POST', headers: headers(), body: '{}' });
+  if (!res.ok) throw new Error(`stats ${res.status}`);
+  return res.json(); // [{question, a_count, b_count}]
+}
+
+async function finish() {
+  show('loading');
+  const str = answers.join('');
+  let stats = null;
+  let notice = '';
+  const alreadyVoted = storageGet(VOTED_KEY);
+
+  if (!configured()) {
+    notice = '통계 서버가 아직 연결되지 않아 내 선택만 보여드려요.';
+  } else {
+    try {
+      if (!alreadyVoted) {
+        await submitAnswers(str);
+        storageSet(VOTED_KEY, '1');
+      } else {
+        notice = '이전에 참여한 기록이 있어서 이번 선택은 통계에 다시 더하지 않았어요.';
+      }
+      stats = await fetchStats();
+    } catch (e) {
+      console.error(e);
+      notice = '통계를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.';
+    }
+  }
+  await new Promise(r => setTimeout(r, 500));
+  renderResult(stats, notice);
+}
+
+/* ---------------- 결과 화면 ---------------- */
+function renderResult(stats, notice) {
+  const byQ = {};
+  (stats || []).forEach(r => { byQ[r.question] = { a: Number(r.a_count), b: Number(r.b_count) }; });
+  const total = byQ[1] ? byQ[1].a + byQ[1].b : 0;
+
+  let sameAsMajority = 0;
+  const items = QUESTIONS.map((q, i) => {
+    const s = byQ[i + 1] || { a: 0, b: 0 };
+    const n = s.a + s.b;
+    const pa = n ? Math.round((s.a / n) * 100) : (stats ? 0 : null);
+    const pb = pa === null ? null : (n ? 100 - pa : 0);
+    const mine = answers[i];
+    if (n && ((mine === 'A' && s.a >= s.b) || (mine === 'B' && s.b >= s.a))) sameAsMajority++;
+    const bar = pa === null ? '' : `
+      <div class="bar">
+        <div class="seg a" data-w="${pa}">${pa >= 14 ? `<span>A ${pa}%</span>` : ''}</div>
+        <div class="seg b" data-w="${pb}">${pb >= 14 ? `<span>${pb}% B</span>` : ''}</div>
+      </div>`;
+    return `
+      <div class="r-item">
+        <div class="r-head"><span class="num">${String(i + 1).padStart(2, '0')}</span><span class="name">${q.title}</span></div>
+        ${bar}
+        <div class="r-opts">
+          <div class="${mine === 'A' ? 'mine' : ''}">A. ${q.a[0]}</div>
+          <div class="${mine === 'B' ? 'mine' : ''}">B. ${q.b[0]}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const aCount = answers.filter(a => a === 'A').length;
+  $('result').innerHTML = `
+    <div class="r-top">
+      <h2 class="display">모두의 선택</h2>
+      <p>이 사이트에 들어온 사람들이 고른 답이에요.</p>
+    </div>
+    ${stats ? `
+    <div class="r-summary">
+      <div><b>${total.toLocaleString()}</b><span>참여자</span></div>
+      <div><b>${sameAsMajority}/10</b><span>다수와 같은 선택</span></div>
+      <div><b>${aCount} : ${10 - aCount}</b><span>내 A : B</span></div>
+    </div>` : `
+    <div class="r-summary">
+      <div><b>${aCount} : ${10 - aCount}</b><span>내 A : B</span></div>
+    </div>`}
+    ${notice ? `<div class="notice">${notice}</div>` : ''}
+    <div class="r-list">${items}</div>
+    <div class="r-actions">
+      <button class="btn display" id="share-btn">친구에게 공유하기</button>
+      <button class="btn ghost display" id="retry-btn">처음부터 다시</button>
+    </div>`;
+  show('result');
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.querySelectorAll('.seg').forEach(el => { el.style.width = el.dataset.w + '%'; });
+  }));
+  $('retry-btn').addEventListener('click', start);
+  $('share-btn').addEventListener('click', share);
+}
+
+async function share() {
+  const data = { title: '트롤리 딜레마', text: '10개의 트롤리 딜레마, 당신의 선택은?', url: location.href };
+  if (navigator.share) {
+    try { await navigator.share(data); } catch (e) {}
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(location.href);
+    toast('링크가 복사됐어요!');
+  } catch (e) {
+    toast(location.href);
+  }
+}
+
+function start() {
+  current = 0;
+  answers = [];
+  busy = false;
+  $('q-body').classList.remove('out', 'in');
+  renderQuestion();
+  show('quiz');
+}
+
+$('intro-art').innerHTML = ART[0]();
+$('start-btn').addEventListener('click', start);
+</script>
+</body>
+</html>
