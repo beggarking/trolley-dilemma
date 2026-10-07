@@ -203,6 +203,7 @@
     <div id="intro-art"></div>
     <p>정답은 없어요. 당신이라면 어떻게 할까요?<br>마지막에 다른 사람들의 선택을 보여드릴게요.</p>
     <button class="btn display" id="start-btn">시작하기</button>
+    <button class="btn ghost display" id="stats-btn">통계 보러가기</button>
   </section>
 
   <section class="screen" id="quiz">
@@ -603,6 +604,7 @@ function renderResult(stats, notice) {
   const byQ = {};
   (stats || []).forEach(r => { byQ[r.question] = { a: Number(r.a_count), b: Number(r.b_count) }; });
   const total = byQ[1] ? byQ[1].a + byQ[1].b : 0;
+  const viewOnly = answers.length === 0; // ?stats 로 통계만 보는 경우
 
   let sameAsMajority = 0;
   const items = QUESTIONS.map((q, i) => {
@@ -622,8 +624,8 @@ function renderResult(stats, notice) {
         <div class="r-head"><span class="num">${String(i + 1).padStart(2, '0')}</span><span class="name">${q.title}</span></div>
         ${bar}
         <div class="r-opts">
-          <div class="${mine === 'A' ? 'mine' : ''}">A. ${q.a[0]}</div>
-          <div class="${mine === 'B' ? 'mine' : ''}">B. ${q.b[0]}</div>
+          <div class="${mine === 'A' ? 'mine' : ''}">A. ${q.a[0]}${viewOnly && stats ? `<br>${s.a}표` : ''}</div>
+          <div class="${mine === 'B' ? 'mine' : ''}">B. ${q.b[0]}${viewOnly && stats ? `<br>${s.b}표` : ''}</div>
         </div>
       </div>`;
   }).join('');
@@ -634,7 +636,10 @@ function renderResult(stats, notice) {
       <h2 class="display">모두의 선택</h2>
       <p>이 사이트에 들어온 사람들이 고른 답이에요.</p>
     </div>
-    ${stats ? `
+    ${viewOnly ? `
+    <div class="r-summary">
+      <div><b>${total.toLocaleString()}</b><span>참여자</span></div>
+    </div>` : stats ? `
     <div class="r-summary">
       <div><b>${total.toLocaleString()}</b><span>참여자</span></div>
       <div><b>${sameAsMajority}/10</b><span>다수와 같은 선택</span></div>
@@ -647,7 +652,7 @@ function renderResult(stats, notice) {
     <div class="r-list">${items}</div>
     <div class="r-actions">
       <button class="btn display" id="share-btn">친구에게 공유하기</button>
-      <button class="btn ghost display" id="retry-btn">처음부터 다시</button>
+      <button class="btn ghost display" id="retry-btn">${viewOnly ? '게임 하러 가기' : '처음부터 다시'}</button>
     </div>`;
   show('result');
   requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -658,17 +663,32 @@ function renderResult(stats, notice) {
 }
 
 async function share() {
-  const data = { title: '트롤리 딜레마', text: '10개의 트롤리 딜레마, 당신의 선택은?', url: location.href };
+  const url = location.origin + location.pathname; // ?stats 같은 꼬리는 빼고 공유
+  const data = { title: '트롤리 딜레마', text: '10개의 트롤리 딜레마, 당신의 선택은?', url };
   if (navigator.share) {
     try { await navigator.share(data); } catch (e) {}
     return;
   }
   try {
-    await navigator.clipboard.writeText(location.href);
+    await navigator.clipboard.writeText(url);
     toast('링크가 복사됐어요!');
   } catch (e) {
-    toast(location.href);
+    toast(url);
   }
+}
+
+// 주소 뒤에 ?stats 를 붙이면 게임 없이 통계 화면만 보여줌
+async function showStatsOnly() {
+  show('loading');
+  let stats = null;
+  let notice = '';
+  if (!configured()) {
+    notice = '통계 서버가 아직 연결되지 않았어요.';
+  } else {
+    try { stats = await fetchStats(); }
+    catch (e) { console.error(e); notice = '통계를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'; }
+  }
+  renderResult(stats, notice);
 }
 
 function start() {
@@ -682,6 +702,8 @@ function start() {
 
 $('intro-art').innerHTML = ART[0]();
 $('start-btn').addEventListener('click', start);
+$('stats-btn').addEventListener('click', () => { answers = []; showStatsOnly(); });
+if (new URLSearchParams(location.search).has('stats')) showStatsOnly();
 </script>
 </body>
 </html>
